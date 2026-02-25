@@ -38,7 +38,7 @@ public final class CobasC311AstSerialServer {
     private final LabResultsClient resultsClient;
 
     public CobasC311AstSerialServer(String portName) {
-        this(portName, null, null, null, null);
+        this(portName, null, null, null, null, null);
     }
 
     public CobasC311AstSerialServer(String portName,
