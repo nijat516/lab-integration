@@ -85,13 +85,13 @@ public class Abl90StableSerialClientV2 {
     }
 
     public Abl90StableSerialClientV2(String portName,
-                                    int baudRate,
-                                    boolean logRawHex,
-                                    boolean logRawAscii,
-                                    String deviceId,
-                                    String resultsEndpoint,
-                                    LabResultsClient resultsClient,
-                                    String deviceRecordId) {
+                                     int baudRate,
+                                     boolean logRawHex,
+                                     boolean logRawAscii,
+                                     String deviceId,
+                                     String resultsEndpoint,
+                                     LabResultsClient resultsClient,
+                                     String deviceRecordId) {
         this.portName = portName;
         this.baudRate = baudRate;
         this.logRawHex = logRawHex;
@@ -331,6 +331,7 @@ public class Abl90StableSerialClientV2 {
 
         // Seliqəli çıxart
         String sampleId = extractSampleId(full);
+        String patientId = extractPatientId(full);
         List<AstmResult> results = extractResults(full);
 
         long durMs = (transmissionStartedAt > 0) ? (System.currentTimeMillis() - transmissionStartedAt) : -1;
@@ -357,7 +358,7 @@ public class Abl90StableSerialClientV2 {
 
         // send JSON to server (if endpoint configured)
         if (resultsClient != null && resultsEndpoint != null && !resultsEndpoint.trim().isEmpty()) {
-            String json = buildUnifiedResultsJson(sampleId, results, full);
+            String json = buildUnifiedResultsJson(sampleId, patientId, results, full);
             int code = resultsClient.postJson(resultsEndpoint, json);
             System.out.println("🌐 HTTP POST -> " + code);
         }
@@ -423,6 +424,24 @@ public class Abl90StableSerialClientV2 {
 
             if (!o3.isEmpty()) return o3;
             if (!o4.isEmpty()) return o4;
+        }
+        return "";
+    }
+
+    /**
+     * PatientId çıxarma:
+     * ASTM-də çox vaxt P| segmentində olur.
+     * Nümunə: P|1||3412||^||||...
+     */
+    private String extractPatientId(String full) {
+        String[] lines = full.split("\\r");
+        for (String line : lines) {
+            if (!line.startsWith("P|")) continue;
+            String[] f = line.split("\\|", -1);
+            String p2 = (f.length > 2) ? safeTrim(f[2]) : "";
+            String p3 = (f.length > 3) ? safeTrim(f[3]) : "";
+            String id = firstNonEmpty(p3, p2, "");
+            if (!id.isEmpty()) return id;
         }
         return "";
     }
@@ -535,12 +554,13 @@ public class Abl90StableSerialClientV2 {
         return "";
     }
 
-    private String buildUnifiedResultsJson(String sampleId, List<AstmResult> results, String rawAstm) {
+    private String buildUnifiedResultsJson(String sampleId, String patientId, List<AstmResult> results, String rawAstm) {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
         sb.append("\"deviceId\":").append(q(deviceId)).append(",");
         sb.append("\"deviceRecordId\":").append(q(deviceRecordId)).append(",");
         sb.append("\"deviceType\":").append(q("ABL90")).append(",");
+        sb.append("\"patientId\":").append(q(patientId)).append(",");
         sb.append("\"sampleId\":").append(q(sampleId)).append(",");
         sb.append("\"results\":[");
         for (int i = 0; i < results.size(); i++) {
