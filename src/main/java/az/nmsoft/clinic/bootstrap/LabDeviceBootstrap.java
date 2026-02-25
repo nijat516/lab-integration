@@ -148,10 +148,12 @@ public class LabDeviceBootstrap implements CommandLineRunner {
                     log("⚠ Missing portName for C311, skipping: " + d.safeLabel() + " | " + describeDevice(d));
                     return;
                 }
+                String c311DeviceId = isBlank(d.deviceId) ? d.id : d.deviceId;
                 String c311Key = deviceRegistry.register(toDeviceInfo(d, type));
                 String c311Endpoint = firstNonEmpty(d.httpEndpoint, firstNonEmpty(defaultResultsUrl, ""));
+                log("🚀 Starting C311: key=" + c311Key + ", deviceId=" + safe(c311DeviceId) + ", port=" + safe(d.portName));
                 executor.submit(() -> runWithRestart(c311Key, () -> {
-                    new CobasC311AstSerialServer(d.portName, d.deviceId, cobasC311OrderClient, c311Endpoint, labResultsClient, d.id).start();
+                    new CobasC311AstSerialServer(d.portName, c311DeviceId, cobasC311OrderClient, c311Endpoint, labResultsClient, d.id).start();
                 }));
                 return;
             case "ABL90":
