@@ -185,7 +185,7 @@ public final class CobasC311AstSerialServer {
                 sendMessage(reply);
             }
 
-            if (fullMessage.contains("RSUPL^REAL")) {
+            if (fullMessage.contains("RSUPL^REAL") || fullMessage.contains("RSUPL^BATCH")) {
                 C311Results results = C311ResultsParser.parse(fullMessage);
                 if (resultsClient != null && resultsEndpoint != null && !resultsEndpoint.trim().isEmpty()) {
                     String json = buildUnifiedResultsJson(results);
@@ -423,7 +423,7 @@ public final class CobasC311AstSerialServer {
             C311ResultItem r = results.items.get(i);
             if (i > 0) sb.append(",");
             sb.append("{")
-                    .append("\"code\":").append(q(r.code)).append(",")
+                    .append("\"code\":").append(q(r.code).replaceAll("/", "")).append(",")
                     .append("\"value\":").append(q(r.value)).append(",")
                     .append("\"unit\":").append(q(r.unit)).append(",")
                     .append("\"flag\":").append(q(r.flag))

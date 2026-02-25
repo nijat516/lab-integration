@@ -19,6 +19,7 @@ public class CobasC311OrderClient {
         try {
             return webClient.post()
                     .uri(orderUrl)
+                    .header("Content-Type", "application/json; charset=utf-8")
                     .bodyValue(req)
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<CobasC311OrderResponse>() {})
