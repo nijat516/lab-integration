@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Lab Device Logs</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 0; height: 100vh; display: flex; }
+      #sidebar { width: 280px; border-right: 1px solid #ddd; padding: 12px; overflow: auto; }
+      #content { flex: 1; display: flex; flex-direction: column; }
+      #header { padding: 10px 12px; border-bottom: 1px solid #ddd; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+      #headerLeft { display: flex; gap: 6px; align-items: center; }
+      #clearBtn { padding: 6px 10px; border: 1px solid #c62828; background: #ffebee; color: #c62828; border-radius: 6px; cursor: pointer; }
+      #clearBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+      #log { flex: 1; padding: 12px; background: #0f1115; color: #e0e0e0; font-family: monospace; overflow: auto; }
+      .device { padding: 8px; border: 1px solid #eee; border-radius: 6px; margin-bottom: 8px; cursor: pointer; }
+      .device.active { border-color: #2e7d32; background: #e8f5e9; }
+      .meta { color: #666; font-size: 12px; }
+      .line { white-space: pre-wrap; }
+      .empty { color: #999; }
+    </style>
+  </head>
+  <body>
+    <div id="sidebar">
+      <h3>Devices</h3>
+      <div id="devices"></div>
+    </div>
+    <div id="content">
+      <div id="header">
+        <div id="headerLeft">
+          <strong id="title">Select a device</strong>
+          <span class="meta" id="subtitle"></span>
+        </div>
+        <button id="clearBtn" disabled>Clear logs</button>
+      </div>
+      <div id="log">
+        <div class="empty">No device selected.</div>
+      </div>
+    </div>
+
+    <script>
+      let currentKey = null;
+      let pollTimer = null;
+      let eventSource = null;
+      const devicesEl = document.getElementById('devices');
+      const logEl = document.getElementById('log');
+      const titleEl = document.getElementById('title');
+      const subtitleEl = document.getElementById('subtitle');
+      const clearBtn = document.getElementById('clearBtn');
+
+      function renderDevices(devices) {
+        devicesEl.innerHTML = '';
+        devices.forEach(d => {
+          const el = document.createElement('div');
+          el.className = 'device';
+          el.dataset.key = d.key;
+          el.innerHTML = `
+            <div><strong>${escapeHtml(d.name || d.type || d.key)}</strong></div>
+            <div class="meta">${escapeHtml(d.key)}</div>
+          `;
+          el.onclick = () => selectDevice(d, el);
+          devicesEl.appendChild(el);
+        });
+      }
+
+      function selectDevice(device, el) {
+        Array.from(document.getElementsByClassName('device')).forEach(x => x.classList.remove('active'));
+        el.classList.add('active');
+        currentKey = device.key;
+        titleEl.textContent = device.name || device.type || device.key;
+        subtitleEl.textContent = ` (${device.key})`;
+        clearBtn.disabled = false;
+        loadLogs(device.key);
+        startPolling(device.key);
+        startStream(device.key);
+      }
+
+      function loadLogs(key) {
+        fetch(`/ui/logs/${encodeURIComponent(key)}`)
+          .then(r => r.json())
+          .then(lines => {
+            renderLogList(lines);
+          });
+      }
+
+      function renderLogList(lines) {
+        logEl.innerHTML = '';
+        if (!lines.length) {
+          logEl.innerHTML = '<div class="empty">No logs yet.</div>';
+          return;
+        }
+        lines.forEach(l => appendLine(l.message));
+        scrollToBottom();
+      }
+
+      function appendLine(message) {
+        const line = document.createElement('div');
+        line.className = 'line';
+        line.textContent = message;
+        logEl.appendChild(line);
+      }
+      function startPolling(key) {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(() => {
+          if (!currentKey || currentKey !== key) return;
+          loadLogs(key);
+        }, 2000);
+      }
+
+      function startStream(key) {
+        if (eventSource) {
+          eventSource.close();
+        }
+        eventSource = new EventSource(`/ui/stream/${encodeURIComponent(key)}`);
+        eventSource.addEventListener('log', e => {
+          const evt = JSON.parse(e.data);
+          if (evt.key !== currentKey) return;
+          appendLine(evt.message);
+          scrollToBottom();
+        });
+      }
+      clearBtn.onclick = () => {
+        if (!currentKey) return;
+        fetch(`/ui/logs/${encodeURIComponent(currentKey)}/clear`, { method: 'POST' })
+          .then(() => {
+            logEl.innerHTML = '<div class="empty">No logs yet.</div>';
+          });
+      };
+
+      function scrollToBottom() {
+        logEl.scrollTop = logEl.scrollHeight;
+      }
+
+      function escapeHtml(s) {
+        if (!s) return '';
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      }
+
+      fetch('/ui/devices')
+        .then(r => r.json())
+        .then(renderDevices);
+
+    </script>
+  </body>
+</html>
