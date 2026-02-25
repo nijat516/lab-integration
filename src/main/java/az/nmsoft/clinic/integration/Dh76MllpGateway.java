@@ -4,11 +4,16 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.*;
-import java.net.*;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.io.PushbackInputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 /**
  * DH-76 (və ümumən HL7 MLLP cihazları) üçün TCP/IP gateway.
@@ -359,6 +364,7 @@ public final class Dh76MllpGateway {
         sb.append("\"deviceId\":").append(q(deviceId)).append(",");
         sb.append("\"deviceRecordId\":").append(q(deviceRecordId)).append(",");
         sb.append("\"deviceType\":").append(q("DH76")).append(",");
+        sb.append("\"patientId\":").append(q(p.patientId)).append(",");
         sb.append("\"sampleId\":").append(q(p.sampleId)).append(",");
         sb.append("\"results\":[");
         for (int i = 0; i < p.results.size(); i++) {

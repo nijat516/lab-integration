@@ -416,6 +416,7 @@ public final class CobasC311AstSerialServer {
         sb.append("\"deviceId\":").append(q(deviceId)).append(",");
         sb.append("\"deviceRecordId\":").append(q(deviceRecordId)).append(",");
         sb.append("\"deviceType\":").append(q("C311")).append(",");
+        sb.append("\"patientId\":").append(q(results.patientId)).append(",");
         sb.append("\"sampleId\":").append(q(results.sampleId)).append(",");
         sb.append("\"results\":[");
         for (int i = 0; i < results.items.size(); i++) {
@@ -476,8 +477,21 @@ public final class CobasC311AstSerialServer {
         return s == null || s.trim().isEmpty();
     }
 
+    private static String firstNonEmpty(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String v : values) {
+            if (!isBlank(v)) {
+                return v.trim();
+            }
+        }
+        return "";
+    }
+
     private static final class C311Results {
         String sampleId = "";
+        String patientId = "";
         String raw = "";
         List<C311ResultItem> items = new ArrayList<C311ResultItem>();
     }
@@ -495,7 +509,12 @@ public final class CobasC311AstSerialServer {
             out.raw = msg;
             String[] recs = msg.split("\r");
             for (String r : recs) {
-                if (r.startsWith("O|")) {
+                if (r.startsWith("P|")) {
+                    String[] f = r.split("\\|", -1);
+                    String p2 = (f.length > 2) ? safeTrim(f[2]) : "";
+                    String p3 = (f.length > 3) ? safeTrim(f[3]) : "";
+                    out.patientId = firstNonEmpty(p2, p3, out.patientId);
+                } else if (r.startsWith("O|")) {
                     String[] f = r.split("\\|", -1);
                     if (f.length > 2 && !isBlank(f[2])) {
                         out.sampleId = f[2].trim();

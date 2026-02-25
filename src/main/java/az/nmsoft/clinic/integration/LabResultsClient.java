@@ -12,6 +12,7 @@ public class LabResultsClient {
         try {
             Integer code = webClient.post()
                     .uri(url)
+                    .header("Content-Type", "application/json; charset=utf-8")
                     .bodyValue(json)
                     .retrieve()
                     .toBodilessEntity()

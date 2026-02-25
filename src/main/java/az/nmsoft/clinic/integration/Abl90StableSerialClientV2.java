@@ -6,8 +6,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
-import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * ABL90 ASTM Serial client (single class, Java 8)
@@ -85,13 +87,13 @@ public class Abl90StableSerialClientV2 {
     }
 
     public Abl90StableSerialClientV2(String portName,
-                                     int baudRate,
-                                     boolean logRawHex,
-                                     boolean logRawAscii,
-                                     String deviceId,
-                                     String resultsEndpoint,
-                                     LabResultsClient resultsClient,
-                                     String deviceRecordId) {
+                                    int baudRate,
+                                    boolean logRawHex,
+                                    boolean logRawAscii,
+                                    String deviceId,
+                                    String resultsEndpoint,
+                                    LabResultsClient resultsClient,
+                                    String deviceRecordId) {
         this.portName = portName;
         this.baudRate = baudRate;
         this.logRawHex = logRawHex;
