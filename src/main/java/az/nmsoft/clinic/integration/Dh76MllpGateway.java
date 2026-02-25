@@ -218,21 +218,23 @@ public final class Dh76MllpGateway {
                 p.version = getField(f, 12);
 
             } else if ("PID".equals(name)) {
-                p.patientId = normalizeCx(getField(f, 3));
-                p.patientName = getField(f, 5);
-                p.dob = getField(f, 7);
-                p.sex = getField(f, 8);
+                p.patientId = normalizeCx(getFieldStd(f, 3));
+                p.patientName = getFieldStd(f, 5);
+                p.dob = getFieldStd(f, 7);
+                p.sex = getFieldStd(f, 8);
 
             } else if ("OBR".equals(name)) {
                 // OBR|1||3072835|01001^Automated Count^99MRC||202512...
-                String obr2 = getField(f, 2);
-                String obr3 = getField(f, 3);
+                // Non-MSH segmentlərdə field nömrəsi birbaşa 1-ci indexdən başlayır:
+                // OBR-2 -> f[2], OBR-3 -> f[3]
+                String obr2 = getFieldStd(f, 2);
+                String obr3 = getFieldStd(f, 3);
                 p.sampleId = firstNonEmpty(normalizeCx(obr3), normalizeCx(obr2), p.sampleId);
 
-                p.orderCode = getField(f, 4);
+                p.orderCode = getFieldStd(f, 4);
 
                 // run datetime best-effort (OBR-7 / OBR-14)
-                p.runDateTime = firstNonEmpty(getField(f, 7), getField(f, 14), p.runDateTime);
+                p.runDateTime = firstNonEmpty(getFieldStd(f, 7), getFieldStd(f, 14), p.runDateTime);
 
             } else if ("OBX".equals(name)) {
                 // OBX-3 = identifier  (6690-2^WBC^LN)
@@ -243,18 +245,20 @@ public final class Dh76MllpGateway {
                 // OBX-11 = status     (F)
                 Result r = new Result();
 
-                String obx3 = getField(f, 4);
+                String obx3 = getFieldStd(f, 3);
                 String[] idParts = splitComponents(obx3); // ^
 
-                r.code = safeArr(idParts, 0);
+                // İstək üzrə "code" olaraq OBX-3.2 (məs: WBC) istifadə olunur.
+                // OBX-3.2 boş olarsa OBX-3.1-ə fallback edirik.
+                r.code = firstNonEmpty(safeArr(idParts, 1), safeArr(idParts, 0), "");
                 r.name = safeArr(idParts, 1);
                 r.system = safeArr(idParts, 2);
 
-                r.value = getField(f, 6);
-                r.unit = getField(f, 7);
-                r.ref = getField(f, 8);
-                r.flag = getField(f, 9);
-                r.status = getField(f, 12);
+                r.value = getFieldStd(f, 5);
+                r.unit = getFieldStd(f, 6);
+                r.ref = getFieldStd(f, 7);
+                r.flag = getFieldStd(f, 8);
+                r.status = getFieldStd(f, 11);
 
                 p.results.add(r);
             }
@@ -280,6 +284,12 @@ public final class Dh76MllpGateway {
 
     private static String getField(String[] f, int idx1Based) {
         int idx = idx1Based - 1;
+        if (idx < 0 || idx >= f.length) return "";
+        return f[idx] == null ? "" : f[idx];
+    }
+
+    private static String getFieldStd(String[] f, int idx1Based) {
+        int idx = idx1Based;
         if (idx < 0 || idx >= f.length) return "";
         return f[idx] == null ? "" : f[idx];
     }
