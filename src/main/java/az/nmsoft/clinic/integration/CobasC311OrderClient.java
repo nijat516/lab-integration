@@ -23,7 +23,7 @@ public class CobasC311OrderClient {
             String reqJson = toJson(req);
             System.out.println("📤 C311 ORDER REQUEST URL: " + orderUrl);
             System.out.println("📤 C311 ORDER REQUEST BODY: " + reqJson);
-
+            req.deviceId="95";
             CobasC311OrderResponse response = webClient.post()
                     .uri(orderUrl)
                     .header("Content-Type", "application/json; charset=utf-8")
