@@ -6,6 +6,8 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.util.Objects;
+
 @Component
 public class CobasC311OrderClient {
     private final WebClient webClient = WebClient.builder().build();
@@ -23,7 +25,6 @@ public class CobasC311OrderClient {
             String reqJson = toJson(req);
             System.out.println("📤 C311 ORDER REQUEST URL: " + orderUrl);
             System.out.println("📤 C311 ORDER REQUEST BODY: " + reqJson);
-            req.deviceId="95";
             CobasC311OrderResponse response = webClient.post()
                     .uri(orderUrl)
                     .header("Content-Type", "application/json; charset=utf-8")
