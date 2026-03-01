@@ -73,6 +73,9 @@ public final class CobasC311AstSerialServer {
 
     /* ===== CONNECT ===== */
     private void connect() throws Exception {
+        // Stale handle qalarsa əvvəlcə təmizlə.
+        safeClose();
+
         port = SerialPort.getCommPort(portName);
         port.setComPortParameters(9600, 8, SerialPort.ONE_STOP_BIT, SerialPort.NO_PARITY);
 
@@ -80,7 +83,16 @@ public final class CobasC311AstSerialServer {
         port.setComPortTimeouts(SerialPort.TIMEOUT_READ_SEMI_BLOCKING, 1000, 0);
 
         if (!port.openPort()) {
-            throw new RuntimeException("COM port açıla bilmədi: " + portName);
+            log("⚠ COM open failed, trying close/reopen: " + portName);
+            try {
+                port.closePort();
+            } catch (Exception ignored) {}
+
+            sleep(300);
+
+            if (!port.openPort()) {
+                throw new RuntimeException("COM port açıla bilmədi (busy/open?): " + portName);
+            }
         }
 
         in = new PushbackInputStream(port.getInputStream(), 1);

@@ -126,6 +126,9 @@ public class Abl90StableSerialClientV2 {
 
     // ================= CONNECT =================
     private void connect() throws Exception {
+        // Stale handle və əvvəlki uğursuz sessiyalardan qalan vəziyyəti təmizlə
+        closePort();
+
         port = SerialPort.getCommPort(portName);
 
         port.setComPortParameters(
@@ -143,7 +146,16 @@ public class Abl90StableSerialClientV2 {
         );
 
         if (!port.openPort()) {
-            throw new RuntimeException("COM port açıla bilmədi: " + portName);
+            System.out.println("⚠ ABL90 COM open failed, trying close/reopen: " + portName);
+            try {
+                port.closePort();
+            } catch (Exception ignored) {}
+
+            sleep(300);
+
+            if (!port.openPort()) {
+                throw new RuntimeException("COM port açıla bilmədi (busy/open?): " + portName);
+            }
         }
 
         in = port.getInputStream();
