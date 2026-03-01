@@ -75,7 +75,7 @@
       }
 
       function loadLogs(key) {
-        fetch(`/ui/logs/${encodeURIComponent(key)}`)
+        fetch(`/nm-clinic-lab/ui/logs/${encodeURIComponent(key)}`)
           .then(r => r.json())
           .then(lines => {
             renderLogList(lines);
@@ -120,7 +120,7 @@
       }
       clearBtn.onclick = () => {
         if (!currentKey) return;
-        fetch(`/ui/logs/${encodeURIComponent(currentKey)}/clear`, { method: 'POST' })
+        fetch(`/nm-clinic-lab/ui/logs/${encodeURIComponent(currentKey)}/clear`, { method: 'POST' })
           .then(() => {
             logEl.innerHTML = '<div class="empty">No logs yet.</div>';
           });
@@ -135,7 +135,7 @@
         return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       }
 
-      fetch('/ui/devices')
+      fetch('/nm-clinic-lab/ui/devices')
         .then(r => r.json())
         .then(renderDevices);
 
