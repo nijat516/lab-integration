@@ -177,22 +177,18 @@ public final class CobasC311AstSerialServer {
             log("📥 ASTM MESSAGE (IN):\n" + visualize(fullMessage));
 
             if (fullMessage.contains("TSREQ^REAL")) {
-                // 1) TSREQ parse
+
                 TsreqInfo tsreq = TsreqParser.parse(fullMessage);
 
-                // 2) OrderData build (static defaults)
                 OrderData od = new OrderData();
-                od.sendingApp = "COZUM"; // logdakı kimi
-                od.patientId = "11111111"; // demo; realda server/JSON
+                od.sendingApp = "SINUS"; // logdakı kimi
                 od.sampleId = tsreq.sampleId;
                 od.rackId = tsreq.rackId;
                 od.position = tsreq.position;
                 od.sampleType = (tsreq.sampleType != null ? tsreq.sampleType : "S1");
                 od.containerType = (tsreq.containerType != null ? tsreq.containerType : "SC");
-                od.testCodes = Arrays.asList("570", "571", "678"); // demo; realda server/JSON
                 od.priority = "R";
                 od.orderDateTime = nowYYYYMMDDHHMMSS(); // demo; realda server/JSON
-                od.comment = "NICATTEST GASIMOVTEST^NMSOFT POLIKLINIKASI 1^^^"; // demo; realda server/JSON
 
                 // 3) Optional: fetch from API and override defaults if provided
                 if (orderClient != null) {
