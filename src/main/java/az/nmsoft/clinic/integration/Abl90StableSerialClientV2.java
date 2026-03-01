@@ -129,7 +129,19 @@ public class Abl90StableSerialClientV2 {
         // Stale handle və əvvəlki uğursuz sessiyalardan qalan vəziyyəti təmizlə
         closePort();
 
-        port = SerialPort.getCommPort(portName);
+        SerialPort[] availablePorts;
+        try {
+            availablePorts = SerialPort.getCommPorts();
+        } catch (Throwable t) {
+            throw new RuntimeException("jSerialComm init/native load error: " + t.getMessage(), t);
+        }
+
+        port = resolvePort(portName, availablePorts);
+        if (port == null) {
+            throw new RuntimeException(
+                    "Configured port not found: " + portName + " | available=" + formatPortList(availablePorts)
+            );
+        }
 
         port.setComPortParameters(
                 baudRate,
@@ -154,7 +166,10 @@ public class Abl90StableSerialClientV2 {
             sleep(300);
 
             if (!port.openPort()) {
-                throw new RuntimeException("COM port açıla bilmədi (busy/open?): " + portName);
+                throw new RuntimeException(
+                        "COM port açıla bilmədi (busy/open?/permission?): " + portName
+                                + " | available=" + formatPortList(availablePorts)
+                );
             }
         }
 
@@ -162,6 +177,57 @@ public class Abl90StableSerialClientV2 {
         out = port.getOutputStream();
 
         System.out.println("✅ ABL-90 CONNECTED (" + portName + "), baud=" + baudRate);
+    }
+
+    private SerialPort resolvePort(String configuredPortName, SerialPort[] ports) {
+        if (configuredPortName == null) return null;
+        String wanted = configuredPortName.trim();
+        if (wanted.isEmpty()) return null;
+
+        String wantedNormalized = normalizePortName(wanted);
+        if (ports == null || ports.length == 0) return null;
+
+        for (SerialPort p : ports) {
+            if (p == null) continue;
+            String sys = safeTrim(p.getSystemPortName());
+            String desc = safeTrim(p.getDescriptivePortName());
+            String desc2 = safeTrim(p.getPortDescription());
+
+            if (wanted.equalsIgnoreCase(sys)
+                    || wanted.equalsIgnoreCase(desc)
+                    || wanted.equalsIgnoreCase(desc2)
+                    || wantedNormalized.equalsIgnoreCase(normalizePortName(sys))
+                    || wantedNormalized.equalsIgnoreCase(normalizePortName(desc))
+                    || wantedNormalized.equalsIgnoreCase(normalizePortName(desc2))) {
+                return p;
+            }
+        }
+
+        return null;
+    }
+
+    private String normalizePortName(String s) {
+        String v = safeTrim(s);
+        if (v.startsWith("/dev/")) v = v.substring(5);
+        if (v.startsWith("tty.")) v = v.substring(4);
+        if (v.startsWith("cu.")) v = v.substring(3);
+        return v;
+    }
+
+    private String formatPortList(SerialPort[] ports) {
+        if (ports == null || ports.length == 0) return "[]";
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < ports.length; i++) {
+            SerialPort p = ports[i];
+            if (i > 0) sb.append(", ");
+            if (p == null) {
+                sb.append("null");
+                continue;
+            }
+            sb.append(safeTrim(p.getSystemPortName()));
+        }
+        sb.append("]");
+        return sb.toString();
     }
 
     // ================= LISTEN LOOP =================

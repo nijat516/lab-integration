@@ -16,6 +16,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import az.nmsoft.clinic.ui.DeviceInfo;
@@ -52,6 +54,7 @@ public class LabDeviceBootstrap implements CommandLineRunner {
     private final MockUiDataService mockUiDataService;
     private final CobasC311OrderClient cobasC311OrderClient;
     private final LabResultsClient labResultsClient;
+    private final Map<String, Runnable> restartHooks = new ConcurrentHashMap<String, Runnable>();
 
     public LabDeviceBootstrap(DeviceRegistry deviceRegistry,
                               MockUiDataService mockUiDataService,
@@ -153,7 +156,15 @@ public class LabDeviceBootstrap implements CommandLineRunner {
                 String c311Endpoint = firstNonEmpty(d.httpEndpoint, firstNonEmpty(defaultResultsUrl, ""));
                 log("🚀 Starting C311: key=" + c311Key + ", deviceId=" + safe(c311DeviceId) + ", port=" + safe(d.portName));
                 executor.submit(() -> runWithRestart(c311Key, () -> {
-                    new CobasC311AstSerialServer(d.portName, c311DeviceId, cobasC311OrderClient, c311Endpoint, labResultsClient, d.id).start();
+                    CobasC311AstSerialServer server = new CobasC311AstSerialServer(
+                            d.portName, c311DeviceId, cobasC311OrderClient, c311Endpoint, labResultsClient, d.id
+                    );
+                    registerRestartHook(c311Key, server::stop);
+                    try {
+                        server.start();
+                    } finally {
+                        clearRestartHook(c311Key);
+                    }
                 }));
                 return;
             case "ABL90":
@@ -165,7 +176,15 @@ public class LabDeviceBootstrap implements CommandLineRunner {
                 String ablEndpoint = firstNonEmpty(d.httpEndpoint, firstNonEmpty(defaultResultsUrl, defaultAbl90ResultsUrl));
                 String abl90Key = deviceRegistry.register(toDeviceInfo(d, type));
                 executor.submit(() -> runWithRestart(abl90Key, () -> {
-                    new Abl90StableSerialClientV2(d.portName, baud, true, true, d.deviceId, ablEndpoint, labResultsClient, d.id).start();
+                    Abl90StableSerialClientV2 client = new Abl90StableSerialClientV2(
+                            d.portName, baud, true, true, d.deviceId, ablEndpoint, labResultsClient, d.id
+                    );
+                    registerRestartHook(abl90Key, client::stop);
+                    try {
+                        client.start();
+                    } finally {
+                        clearRestartHook(abl90Key);
+                    }
                 }));
                 return;
             case "DH76":
@@ -181,10 +200,14 @@ public class LabDeviceBootstrap implements CommandLineRunner {
                 String deviceId = isBlank(d.deviceId) ? d.id : d.deviceId;
                 String dh76Key = deviceRegistry.register(toDeviceInfo(d, type));
                 executor.submit(() -> runWithRestart(dh76Key, () -> {
+                    Dh76MllpGateway gateway = new Dh76MllpGateway(d.listenPort, endpoint, deviceId, labResultsClient, d.id);
+                    registerRestartHook(dh76Key, gateway::stop);
                     try {
-                        new Dh76MllpGateway(d.listenPort, endpoint, deviceId, labResultsClient, d.id).start();
+                        gateway.start();
                     } catch (Exception e) {
                         throw new RuntimeException(e);
+                    } finally {
+                        clearRestartHook(dh76Key);
                     }
                 }));
                 return;
@@ -204,6 +227,33 @@ public class LabDeviceBootstrap implements CommandLineRunner {
                 sleep(3000);
             }
         }
+    }
+
+    public boolean restartDevice(String key) {
+        if (isBlank(key)) return false;
+        Runnable stopAction = restartHooks.get(key);
+        if (stopAction == null) {
+            log("⚠ Restart requested for inactive/unknown device: " + key);
+            return false;
+        }
+        try {
+            log("🔄 Restart requested: " + key);
+            stopAction.run();
+            return true;
+        } catch (Exception e) {
+            log("❌ Restart failed for " + key + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    private void registerRestartHook(String key, Runnable stopAction) {
+        if (isBlank(key) || stopAction == null) return;
+        restartHooks.put(key, stopAction);
+    }
+
+    private void clearRestartHook(String key) {
+        if (isBlank(key)) return;
+        restartHooks.remove(key);
     }
 
     private static String normalizeType(String raw) {

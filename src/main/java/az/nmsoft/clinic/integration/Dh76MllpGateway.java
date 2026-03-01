@@ -9,9 +9,11 @@ import java.io.OutputStream;
 import java.io.PushbackInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.charset.Charset;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -42,6 +44,9 @@ public final class Dh76MllpGateway {
     private final String deviceId;
     private final LabResultsClient resultsClient;
     private final String deviceRecordId;
+    private volatile boolean running = true;
+    private volatile ServerSocket serverSocket;
+    private final List<Socket> activeSockets = Collections.synchronizedList(new ArrayList<Socket>());
 
     public Dh76MllpGateway(int listenPort, String httpEndpoint, String deviceId, LabResultsClient resultsClient, String deviceRecordId) {
         this.listenPort = listenPort;
@@ -52,19 +57,53 @@ public final class Dh76MllpGateway {
     }
 
     public void start() throws Exception {
+        running = true;
         ServerSocket server = new ServerSocket(listenPort);
+        serverSocket = server;
         log("✅ DH-76 MLLP Gateway started on port " + listenPort);
         log("➡ HTTP endpoint: " + httpEndpoint);
         log("➡ deviceId: " + deviceId);
 
-        while (true) {
-            final Socket socket = server.accept();
-            socket.setTcpNoDelay(true);
-            socket.setSoTimeout(0); // block
-            Thread t = new Thread(() -> handleClient(socket),
-                    "dh76-" + listenPort + "-client-" + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
-            t.start();
+        try {
+            while (running) {
+                try {
+                    final Socket socket = server.accept();
+                    if (!running) {
+                        try { socket.close(); } catch (Exception ignored) {}
+                        break;
+                    }
+                    activeSockets.add(socket);
+                    socket.setTcpNoDelay(true);
+                    socket.setSoTimeout(0); // block
+                    Thread t = new Thread(() -> handleClient(socket),
+                            "dh76-" + listenPort + "-client-" + socket.getInetAddress().getHostAddress() + ":" + socket.getPort());
+                    t.start();
+                } catch (SocketException se) {
+                    if (running) throw se;
+                    break;
+                }
+            }
+        } finally {
+            serverSocket = null;
+            try { server.close(); } catch (Exception ignored) {}
         }
+    }
+
+    public void stop() {
+        running = false;
+        try {
+            if (serverSocket != null) {
+                serverSocket.close();
+            }
+        } catch (Exception ignored) {}
+
+        synchronized (activeSockets) {
+            for (Socket s : activeSockets) {
+                try { s.close(); } catch (Exception ignored) {}
+            }
+            activeSockets.clear();
+        }
+        log("🛑 DH76 stop requested");
     }
 
     private void handleClient(Socket socket) {
@@ -74,7 +113,7 @@ public final class Dh76MllpGateway {
         try (PushbackInputStream in = new PushbackInputStream(socket.getInputStream(), 1);
              OutputStream out = socket.getOutputStream()) {
 
-            while (true) {
+            while (running) {
                 String hl7 = readMllpMessage(in);
                 if (hl7 == null) {
                     log("🔌 Client disconnected: " + peer);
@@ -120,6 +159,7 @@ public final class Dh76MllpGateway {
         } catch (Exception e) {
             log("❌ Client error (" + peer + "): " + e.getMessage());
         } finally {
+            activeSockets.remove(socket);
             try { socket.close(); } catch (Exception ignored) {}
         }
     }

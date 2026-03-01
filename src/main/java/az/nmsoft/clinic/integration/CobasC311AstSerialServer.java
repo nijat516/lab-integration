@@ -36,6 +36,7 @@ public final class CobasC311AstSerialServer {
     private final StringBuilder messageBuffer = new StringBuilder();
     private final CobasC311OrderClient orderClient;
     private final LabResultsClient resultsClient;
+    private volatile boolean running = true;
 
     public CobasC311AstSerialServer(String portName) {
         this(portName, null, null, null, null, null);
@@ -57,18 +58,29 @@ public final class CobasC311AstSerialServer {
 
     /* ===== START ===== */
     public void start() {
-        while (true) {
+        running = true;
+        while (running) {
             try {
                 if (port == null || !port.isOpen()) {
                     connect();
                 }
                 listen(); // normally never returns while port is open
             } catch (Exception e) {
+                if (!running) {
+                    break;
+                }
                 log("❌ ERROR: " + e.getMessage());
                 safeClose();
                 sleep(1500);
             }
         }
+        safeClose();
+    }
+
+    public void stop() {
+        running = false;
+        safeClose();
+        log("🛑 C311 stop requested");
     }
 
     /* ===== CONNECT ===== */
@@ -105,7 +117,7 @@ public final class CobasC311AstSerialServer {
 
     /* ===== LISTEN ===== */
     private void listen() throws Exception {
-        while (port != null && port.isOpen()) {
+        while (running && port != null && port.isOpen()) {
             try {
                 int b = in.read();
 
